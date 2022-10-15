@@ -1,0 +1,4 @@
+- 👋 Hi, I’m @dailydouble7
+- 👀 I’m interested in trading, stock market, HFT
+- 🌱 I’m currently learning Macroeconomics
+- 💞️ I’m looking to collaborate on Business 
