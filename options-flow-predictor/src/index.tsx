@@ -8,6 +8,7 @@ import { buildFeatures } from "./features";
 import { predict, type Direction, type Horizon, type Prediction } from "./model";
 import { mountFlowChart } from "./flowchart";
 import { abbr, fixed, num, pct, signedPct } from "./format";
+import { loadSettings, saveSettings, clearSettings, hasKey } from "./settings";
 import "./styles.css";
 
 // ---- command parsing ----------------------------------------------------------
@@ -33,8 +34,20 @@ function App() {
     const [symbolInput, setSymbolInput] = createSignal(config().symbol);
     const [liveSpot, setLiveSpot] = createSignal<number | null>(null);
     const [liveChange, setLiveChange] = createSignal<number | null>(null);
+    const [showSettings, setShowSettings] = createSignal(false);
+    const [reloadN, setReloadN] = createSignal(0);
+    const [keySet, setKeySet] = createSignal(hasKey());
 
-    const [bundle, { refetch }] = createResource(config, (c) => fetchBundle(c.symbol));
+    // Resource + WebSocket both key off symbol *and* a reload nonce so saving
+    // new credentials re-fetches data and reconnects the socket.
+    const source = () => ({ symbol: config().symbol, n: reloadN() });
+    const [bundle, { refetch }] = createResource(source, (s) => fetchBundle(s.symbol));
+
+    function onSettingsSaved() {
+        setKeySet(hasKey());
+        setShowSettings(false);
+        setReloadN((n) => n + 1);
+    }
 
     // Derived model output.
     const prediction = (): Prediction | null => {
@@ -46,6 +59,7 @@ function App() {
     // Live spot subscription over the app WebSocket.
     createEffect(() => {
         const sym = config().symbol;
+        reloadN(); // reconnect when credentials change
         setLiveSpot(null);
         setLiveChange(null);
         let socket: WebSocket | null = null;
@@ -112,15 +126,29 @@ function App() {
                     />
                     <button type="submit" class="go">Predict</button>
                     <button type="button" class="refresh" onClick={() => refetch()} title="Refresh">↻</button>
+                    <button
+                        type="button"
+                        class={`refresh gear ${keySet() ? "keyset" : ""}`}
+                        onClick={() => setShowSettings(true)}
+                        title={keySet() ? "Settings — API key set" : "Settings — add API key"}
+                    >⚙</button>
                 </form>
             </header>
+
+            <Show when={showSettings()}>
+                <SettingsModal onSaved={onSettingsSaved} onClose={() => setShowSettings(false)} />
+            </Show>
 
             <Show when={bundle.loading}>
                 <div class="state loading">Loading {config().symbol} options flow…</div>
             </Show>
             <Show when={bundle.error as unknown}>
                 <div class="state error">
-                    Failed to load {config().symbol}. Check the symbol and that the app is launched from ConvexValue.
+                    <div>Failed to load {config().symbol}.</div>
+                    <div class="state-sub">
+                        Launch this app from ConvexValue, or paste your ConvexValue API key in
+                        {" "}<button type="button" class="linkbtn" onClick={() => setShowSettings(true)}>Settings ⚙</button>.
+                    </div>
                 </div>
             </Show>
 
@@ -344,6 +372,94 @@ function TermPanel(props: { bundle: MarketBundle }) {
                 </table>
             </Show>
         </section>
+    );
+}
+
+function SettingsModal(props: { onSaved: () => void; onClose: () => void }) {
+    const initial = loadSettings();
+    const [token, setToken] = createSignal(initial.token ?? "");
+    const [apiBase, setApiBase] = createSignal(initial.apiBaseUrl ?? "");
+    const [wsBase, setWsBase] = createSignal(initial.wsBaseUrl ?? "");
+    const [reveal, setReveal] = createSignal(false);
+
+    function save(e: Event) {
+        e.preventDefault();
+        saveSettings({ token: token(), apiBaseUrl: apiBase(), wsBaseUrl: wsBase() });
+        props.onSaved();
+    }
+    function clear() {
+        clearSettings();
+        setToken("");
+        setApiBase("");
+        setWsBase("");
+        props.onSaved();
+    }
+
+    return (
+        <div class="modal-overlay" onClick={props.onClose}>
+            <form class="modal" onClick={(e) => e.stopPropagation()} onSubmit={save}>
+                <div class="modal-head">
+                    <h3>Settings</h3>
+                    <button type="button" class="modal-x" onClick={props.onClose} title="Close">✕</button>
+                </div>
+
+                <label class="field">
+                    <span class="field-label">ConvexValue API key</span>
+                    <div class="field-key">
+                        <input
+                            class="field-input mono"
+                            type={reveal() ? "text" : "password"}
+                            value={token()}
+                            onInput={(e) => setToken(e.currentTarget.value)}
+                            placeholder="paste your API key"
+                            spellcheck={false}
+                            autocomplete="off"
+                        />
+                        <button type="button" class="reveal" onClick={() => setReveal((r) => !r)} title="Show / hide">
+                            {reveal() ? "🙈" : "👁"}
+                        </button>
+                    </div>
+                    <span class="field-help">
+                        Sent as a Bearer token to ConvexValue. Stored only in this browser.
+                        Leave blank to use ConvexValue's built-in session auth.
+                    </span>
+                </label>
+
+                <details class="advanced">
+                    <summary>Advanced — off-origin endpoints</summary>
+                    <label class="field">
+                        <span class="field-label">API base URL</span>
+                        <input
+                            class="field-input mono"
+                            type="text"
+                            value={apiBase()}
+                            onInput={(e) => setApiBase(e.currentTarget.value)}
+                            placeholder="https://convexvalue.com"
+                            spellcheck={false}
+                            autocomplete="off"
+                        />
+                        <span class="field-help">Only needed when the app is served outside the ConvexValue origin.</span>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">WebSocket base URL</span>
+                        <input
+                            class="field-input mono"
+                            type="text"
+                            value={wsBase()}
+                            onInput={(e) => setWsBase(e.currentTarget.value)}
+                            placeholder="wss://convexvalue.com"
+                            spellcheck={false}
+                            autocomplete="off"
+                        />
+                    </label>
+                </details>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-ghost" onClick={clear}>Clear</button>
+                    <button type="submit" class="go">Save & reload</button>
+                </div>
+            </form>
+        </div>
     );
 }
 

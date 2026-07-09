@@ -35,6 +35,17 @@ Live data (`getUnd`, `getTrmChain`, `getFlowchart`, WebSocket) is authenticated
 by the ConvexValue app-session cookie once the app is uploaded and launched from
 the ConvexValue origin — so full data loads there, not in bare `npm run dev`.
 
+### Using your own API key (run it anywhere)
+
+To run the dashboard **outside** the ConvexValue origin, open **Settings ⚙** in
+the header and paste your ConvexValue **API key**. The key is stored only in
+your browser (localStorage) and sent as an `Authorization: Bearer` token on REST
+calls and a `?token=` param on the WebSocket — nothing is hardcoded in the
+bundle. If you're serving the app off-origin, also set the **API base URL** /
+**WebSocket base URL** under *Advanced*. Leave the key blank to fall back to
+ConvexValue's built-in session auth. Under the hood this drives the
+`@convexvalue/app` `configureRuntime({ token, apiBaseUrl, wsBaseUrl })` runtime.
+
 ## How the notebook maps onto live ConvexValue data
 
 The original notebook engineers four families of "smart money" signals and feeds
