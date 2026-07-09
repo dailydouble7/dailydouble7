@@ -1,0 +1,7 @@
+{
+  "schema": "https://convexvalue.com/schemas/convexapp.v1.json",
+  "name": "options-flow-predictor",
+  "entry": "index.html",
+  "generated_by": "create-convexvalue",
+  "template": "joy"
+}
