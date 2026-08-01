@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spxvol"
+version = "0.1.0"
+description = "Implied vol and rich-trade detection for SPX options from OHLCV bars"
+readme = "spxvol/README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+spxvol = "spxvol.cli:main"
+
+[tool.setuptools]
+packages = ["spxvol"]
+
+[tool.setuptools.package-data]
+spxvol = ["README.md"]
